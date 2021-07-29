@@ -1,0 +1,347 @@
+---
+title: "Zaman Serisi Analizi Vize"
+author: "Yasemin Hızarcı 121516005"
+date: "12 12 2020"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Kullanilan veri:
+
+### Norvec'te Yeni Araba Satislari
+### 2007-2017 icin aylik otomobil satislari
+
+Norvec'teki otomobil satislarinin aylara gore ozet istatistikleri.
+
+**Quantity(Miktar)  Satilan toplam birim sayisi**
+
+**Quantity_YoY**  Birim cinsinden YY(bir onceki yilin ayni donemine kiyasla) degisim
+
+**Import(ithalat)**  Ithal edilen toplam birim sayisi  
+
+**Import_YoY ** Birim cinsinden gecen yil ayni aya gore degisim.
+
+**Used** Ulke icindeki birim sahibi degisikliklerinin toplam sayisi (2012 verileri mevcuttur)
+
+**Used_YoY ** Birim cinsinden YY degisim.
+
+**Avg_CO2**- Belirli bir ayda satilan tum arabalarin ortalama CO2 emisyonu (g / km cinsinden)  
+
+**Bensin_Co2** - Belirli bir ayda satilan benzin yakitli arabalarin ortalama CO2 emisyonu (g / km cinsinden)
+
+**Diesel_Co2** - Belirli bir ayda satilan dizel yakitli arabalarin ortalama CO2 emisyonu (g / km olarak)
+
+**Quantity_Diesel** - Belirli bir ayda ulkede satilan dizel yakitli araba sayisi
+
+**Diesel_Share** - Dizel arabalarin toplam satislar icindeki payi (Miktar Dizel / Miktar)
+
+**Diesel_Share_LY** - Bir yil onceki toplam satislar icinde dizel arabalarin payi
+
+**Quantity_Hybrid **- Ulkede satilan yeni hibrit otomobil sayisi (hem PHEV hem de BV)
+
+**Quantity_Electric** - Ukede satilan yeni elektrikli otomobil sayisi.
+
+**Import_Electric** - Ulkeye ithal edilen kullanilmis elektrikli otomobil sayisi 
+
+Not: Hibrit ve elektrikli otomobil satislarina iliskin rakamlar 2011'den once mevcut degildir
+
+
+```{r message=FALSE, warning=FALSE}
+library(fpp2)
+```
+
+
+
+```{r}
+carsales<-read.csv(file="C:/Users/yasem/OneDrive/Belgeler/datas/norwaycarsales.csv",
+                          header=TRUE,sep=",")
+
+head(carsales)
+```
+
+```{r}
+summary(carsales)
+```
+
+Aylik toplam araba satislarini belirten "Quantity" degiskenini ts() ile zaman serisi verisi haline getiriyorum.
+
+```{r message=FALSE, warning=FALSE}
+Quantity <- ts(carsales$Quantity, start = c(2007,1), frequency = 12)
+Quantity
+```
+# **Soru1**
+
+**Veri setinize iliskin zaman serisi grafigini cizdiriniz. Veri setinizde trend ve mevsimsellik var midir? Eger mevsimsellik oldugunu dusunuyorsaniz ilgili mevsimsellik grafiklerini (seasonal plot) cizdiriniz. Yorumlayiniz.**
+
+```{r}
+autoplot(Quantity) +
+ggtitle("Norvec Araba Satislari ") +
+xlab("Zaman") +
+ylab("Araba Satislari")
+```
+
+2009 dan itibaren artan bir trend vardir.
+
+Mevsimselligi daha detayli incelemek istiyorum.
+
+```{r}
+ggseasonplot(Quantity, year.labels=TRUE, year.labels.left=TRUE) +
+ylab("Araba satisi") +
+ggtitle("Seasonal plot:Aylik toplam araba satislari")
+
+```
+
+
+
+```{r}
+ggseasonplot(Quantity, polar=TRUE) +
+ylab("Miktar") +
+ggtitle("Polar seasonal plot: Aylik araba satislari")
+```
+
+Mevsimsellik ozellikleri anlamli degildir.
+
+
+# **Soru2**
+
+**Verinize iliskin otokorelasyon (ACF) grafigi cizdiriniz ve yorumlayiniz.**
+
+
+```{r}
+ggAcf(Quantity)
+```
+
+Dikey cizgiler mavi kesikli cizgi ile belirtilen sinirlar icinde degildir.Cizgilerin bu sinirlari asmasi otokorelasyon oldugunun kanitidir.Bu zaman serisi beyaz gurultu serisi degildir.
+
+Gecikmeler arttikca ACF’deki yavas dusus trendden kaynaklanmaktadir. “tarakli” sekil yani mevsimsellik belirtisi guclu degildir..
+
+
+
+
+
+# **Soru3** 
+
+**Verinizi egitim ve test (train, test) olarak iki parcaya ayirin.**
+
+
+```{r}
+train<-window(Quantity,end=c(2014,12))#ilk 96 ayi train olarak aldim.
+test<-window(Quantity, start=c(2015,1)) #son 25 ayi test seti olarak aldim.
+
+```
+
+
+## a)
+
+**Egitim setinizi, ortalama, naive, box-cox donusumlu naive metod (veri setinize uygun olan naive metod) kullanarak modelleyiniz.**
+
+**15 ayin tahmini icin:**
+
+```{r}
+lambda <- BoxCox.lambda(train)
+lambda
+```
+
+train verisini kullanarak sonraki 15 ayi tahmin etmek istedigim icin h=15 aldim.
+
+```{r}
+
+#ortalama
+fit1<-meanf(train, h=15)
+
+#naive
+fit2<-rwf(train, h=15)
+
+#box-cox donusumlu naive
+fit3=rwf(train, lambda=BoxCox.lambda(train),drift=TRUE, h=15,level=10)
+
+```
+
+
+
+
+## b)
+
+**Bu uc modelin test seti uzerindeki performansini gosteren zaman serisi grafigi cizdiriniz.**
+
+
+```{r}
+autoplot(Quantity) +
+autolayer(fit1, series="Mean",PI=FALSE) +
+autolayer(fit2, series="Naive",PI=FALSE) +
+autolayer(fit3, series="BoxCox donusumlu naive") +
+xlab("Ay") + ylab("Satis miktari") +
+guides(colour=guide_legend(title="Forecast"))
+
+```
+
+2015`e kadar olan gozlemler train verisindedir.2015 in birinci ayindan itibaren de test verisine ait gozlemler vardir.Train verisi kullanilarak(2015 yilina kadar olan gozlemler kullanilarak) sonraki 15 ay tahmin edilmistir.Siyah cizgiler orijinal gozlemlerdir.Yesil cizgi 15 ay icin ortalama tahminidir.Kırmızı cizgi BoxCox donusumlu naive tahminidir.Naive tahmini ise BoxCox donusumlu tahminin altinda kaldigi icin gorunmemistir.Grafige bakarak ortalama tahmininin bu model icin pek uygun olmadigi sonucuna varilabilir.BoxCox ve Naive tahmini daha uygun gorunmektedir.
+
+
+## c)
+
+**Modellerin test seti uzerindeki performanslarini MAPE ve RMSE kriterlerine gore kiyaslayiniz.**
+
+```{r}
+accuracy(fit1, test)
+```
+
+```{r}
+accuracy(fit2, test)
+```
+
+```{r}
+accuracy(fit3, test)
+```
+
+
+Mean: MAPE:13.97641, RMSE:2111.692
+
+Naive: MAPE:7.055695,  RMSE:1111.103
+
+Box-Cox donusumlu naive: MAPE:7.050332,  RMSE:1111.155
+
+
+En yuksek MAPE ve RMSE degerleri Mean yontemindedir.Diger yontemlere gore bu degerler cok daha yuksek cikmistir ve bu durum bize mean yonteminin bu model icin en kotu tahmin yontemi oldugunu gosterir.
+
+Naive ve Box-Cox donusumlu Naive`de MAPE ve RMSE sonuclari birbirine yakindir.
+
+En iyi yontemin ise  naive yontemi oldugu gorulmektedir.RMSE degeri digerlerinden daha dusuktur.
+
+
+
+
+## d)
+
+**Modellerin performansini, training seti cross validation artiklari (h=1 adim) uzerinden hesaplanan RMSE degerlerine gore karsilastiriniz.**
+
+```{r}
+
+#mean
+e <- tsCV(train, meanf, h=1)
+RMSEmean<-sqrt(mean(e^2, na.rm=TRUE))
+
+#naive
+e <- tsCV(train, rwf, h=1)
+RMSEnaive<-sqrt(mean(e^2, na.rm=TRUE))
+
+#Box-Cox
+e <- tsCV(train, rwf,drift=TRUE,lambda=1.999924, h=1)
+RMSEBoxCoxNaive<-sqrt(mean(e^2, na.rm=TRUE))
+```
+
+```{r}
+RMSEmean
+```
+
+
+```{r}
+RMSEnaive
+```
+
+```{r}
+RMSEBoxCoxNaive
+```
+training seti cross validation artiklari (h=1 adim) uzerinden hesaplanan RMSE degerlerine gore en iyi model naive modeldir.
+
+## e)
+
+**Naive modelin artiklari icin otokorelasyon varsayimini, uygun gecikme sayisini belirledikten sonra Portmanteau testler yardimiyla test ediniz.**
+
+
+```{r}
+res <- residuals(naive(Quantity))
+
+```
+
+
+**H0 : Seri beyaz gurultu serisidir**
+**H1 : Otokorelasyon problemi vardir**
+
+### Box-Pierce test:
+
+mevsimsellik olmadigi icin gecikme 10 alinmistir.
+
+```{r}
+Box.test(res, lag=10, fitdf=0)
+```
+### Box-Ljung test:
+
+```{r}
+Box.test(res,lag=10, fitdf=0, type="Lj")
+
+```
+Ho reddedilir.Otokorelasyon problemi vardir.
+
+## f)
+
+**Naive modelin artiklari icin normallik varsayimini test ediniz, test sonucunuza gore, test seti uzerindeki tahminleriniz icin uygun %80 lik tahmin araligini belirleyiniz.**
+
+```{r message=FALSE, warning=FALSE}
+autoplot(res) + xlab("year") + ylab("") +
+ggtitle("Residuals from naive method")
+
+```
+
+Grafige gore artiklar 0 etrafinda duzenli olarak dagilmaktadir.
+
+```{r message=FALSE, warning=FALSE}
+gghistogram(res) + ggtitle("Histogram of residuals")
+
+```
+
+Histogram sonucuna gore Naive modelin artiklarinin normal dagilima yakin oldugu goruluyor.
+
+
+# **Soru4:** 
+**Training set uzerinde regresyon modeli kurarak trend ve mevsimselligi inceleyiniz. Modelin test ve training set uzerindeki tahmin performansini incelemek icin zaman serisi grafigi cizdiriniz. Test seti icin RMSE degerini hesaplayiniz.**
+
+
+```{r}
+fit.quantity <- tslm(train ~ trend + season)
+summary(fit.quantity)
+
+```
+
+Her ayda ortalama 32 araba fazla satis var. Ortalama olarak ikinci ayda ilk aya gore 293 dusuk satis vardir.Ucuncu ayda ilk aya gore 1002 fazla satis vardir.Diger aylarda da ilk aya gore artis ve azalislar olmustur.
+
+trend anlamli cikmistir.
+Mevsimsellik ise anlamli degildir.
+
+```{r}
+fit.quantity <- tslm(train ~ trend + season)
+fcast <- forecast(fit.quantity)
+autoplot(fcast) +
+ggtitle("Regresyon ile araba satisi tahminleri") +
+xlab("Year") + ylab("miktar")
+```
+
+Koyu golgeli bolge %80 tahmin araliklarini gosterir ve acik golgeli bolge %95 tahmin araliklarini gosterir.
+
+
+**Test seti icin RMSE degeri**
+
+
+```{r}
+accuracy(fcast, test)
+```
+
+RMSE:993.8439
+
+
+
+
+
+
+
+
+
+
+
+
+...
